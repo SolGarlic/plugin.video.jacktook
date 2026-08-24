@@ -209,7 +209,6 @@ def search_direct(params):
     for item_mode, text in cache.get_list(key=history_key):
         list_item = make_list_item(label=f"[I]{text}[/I]")
         list_item.setArt({"icon": os.path.join(ADDON_PATH, "resources", "img", "search.png")})
-        list_item.setProperty("IsPlayable", "true")
         list_item.addContextMenuItems(
             [
                 (

@@ -52,6 +52,32 @@ def test_direct_search_history_context_menu_opens_source_manager():
     ) in context_menu
 
 
+def test_direct_search_history_item_dispatches_search_without_playback():
+    search_item = MagicMock()
+    history_item = MagicMock()
+    clear_item = MagicMock()
+
+    with patch("lib.nav.library_history.cache.get_list", return_value=[("direct", "Demo")]), patch(
+        "lib.nav.library_history.make_list_item",
+        side_effect=[search_item, history_item, clear_item],
+    ), patch("lib.nav.library_history.set_pluging_category"), patch(
+        "lib.nav.library_history.show_keyboard", return_value=""
+    ), patch("lib.nav.library_history.addDirectoryItem") as add_directory_item, patch(
+        "lib.nav.library_history.endOfDirectory"
+    ), patch("lib.nav.library_history.apply_section_view"), patch(
+        "lib.nav.library_history.build_url", side_effect=lambda action, **_kwargs: action
+    ) as build_url:
+        library_history.search_direct({"mode": "direct"})
+
+    history_item.setProperty.assert_not_called()
+    build_url.assert_any_call("search", mode="direct", query="Demo", direct=True)
+    history_call = next(
+        call for call in add_directory_item.call_args_list if call.args[2] is history_item
+    )
+    assert history_call.args[1] == "search"
+    assert history_call.kwargs["isFolder"] is False
+
+
 def test_jackgram_search_history_uses_isolated_cache_and_filtered_links():
     search_item = MagicMock()
     history_item = MagicMock()

@@ -131,6 +131,7 @@ def _normalize_manifest_url(url):
 
 
 def _is_local_or_private_host(url):
+    """Whether the URL host is an IP literal or resolves to a private/loopback address."""
     host = (urlsplit(url).hostname or "").lower()
     if not host:
         return False
@@ -141,7 +142,25 @@ def _is_local_or_private_host(url):
         ip = ipaddress.ip_address(host)
         return ip.is_private or ip.is_loopback
     except ValueError:
+        pass
+
+    try:
+        addresses = [entry[4][0] for entry in socket.getaddrinfo(host, None)]
+    except (OSError, UnicodeError):
         return False
+
+    if not addresses:
+        return False
+
+    return all(_is_local_ip(address) for address in addresses)
+
+
+def _is_local_ip(address):
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback
 
 
 def _safe_url_description(url):
@@ -182,6 +201,10 @@ def _fetch_manifest(url, initial_url):
                     raise ValueError("manifest too large")
             manifest = json.loads(content.decode("utf-8"))
             return resp, manifest, None
+        except ValueError as ex:
+            # ValueError here comes from our own validation or JSON decoding;
+            # the message is static and safe to surface to the UI.
+            return None, None, str(ex) or type(ex).__name__
         except Exception as ex:
             return None, None, type(ex).__name__
 

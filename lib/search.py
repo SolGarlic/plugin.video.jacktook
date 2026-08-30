@@ -790,21 +790,22 @@ def run_search_entry(params: dict):
     force_select = params.get("force_select", False)
     autoplay_context = params.get("autoplay_context")
 
+    # Fixed: if Auto-Play is enabled but fails (most commonly because
+    # results exist but none match the preferred auto_play_quality), fall
+    # back to the manual source-select screen instead of just cancelling
+    # playback. The user still gets to pick a source manually rather than
+    # a bare "no sources" failure when sources did in fact exist.
     if auto_play_enabled() and not force_select:
-        if (
-            not auto_play(
-                final_results,
-                ids,
-                tv_data,
-                mode,
-                preferred_group,
-                autoplay_context=autoplay_context,
-                playback_context=playback_resume,
-            )
-            and not skip_cancel
+        if auto_play(
+            final_results,
+            ids,
+            tv_data,
+            mode,
+            preferred_group,
+            autoplay_context=autoplay_context,
+            playback_context=playback_resume,
         ):
-            cancel_playback()
-        return
+            return
 
     if (
         not show_source_select(

@@ -795,7 +795,8 @@ def run_search_entry(params: dict):
     # back to the manual source-select screen instead of just cancelling
     # playback. The user still gets to pick a source manually rather than
     # a bare "no sources" failure when sources did in fact exist.
-    if auto_play_enabled() and not force_select:
+    autoplay_attempted = auto_play_enabled() and not force_select
+    if autoplay_attempted:
         if auto_play(
             final_results,
             ids,
@@ -819,6 +820,7 @@ def run_search_entry(params: dict):
             direct,
             autoplay_context=autoplay_context,
             playback_context=playback_resume,
+            rejection_already_notified=autoplay_attempted,
         )
         and not skip_cancel
     ):
@@ -1685,6 +1687,7 @@ def show_source_select(
     direct: bool = False,
     autoplay_context: Optional[str] = None,
     playback_context: Optional[dict] = None,
+    rejection_already_notified: bool = False,
 ) -> bool:
     rejection_reasons = []
     results = _prepare_stremio_results(
@@ -1693,7 +1696,7 @@ def show_source_select(
         rejection_reasons=rejection_reasons,
     )
     if not results:
-        if rejection_reasons:
+        if rejection_reasons and not rejection_already_notified:
             notification(rejection_reasons[0])
         return False
 

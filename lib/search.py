@@ -540,6 +540,16 @@ def _resolve_cached_source(source: Any, params: Mapping[str, Any]):
 
 
 def _handle_super_quick_play(params: dict) -> bool:
+    if params.get("force_select"):
+        # run_search_entry() calls _handle_super_quick_play() before it
+        # even reads "force_select" from params, so an explicit "Source
+        # Select" / "Scrape again" request (which sets force_select=True)
+        # was being silently overridden by a stale cached entry here -
+        # the user asked to choose a source and got a cached one replayed
+        # instead, without ever seeing the source list.
+        kodilog("Super quick play: force_select requested, skipping cached shortcut")
+        return False
+
     if not get_setting("super_quick_play", False):
         kodilog("Super quick play disabled")
         return False

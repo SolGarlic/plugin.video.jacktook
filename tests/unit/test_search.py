@@ -150,6 +150,30 @@ def test_super_quick_play_plays_resolved_plugin_locator_without_reclassifying():
     assert played_data["magnet"] == cached_playback_info["magnet"]
 
 
+def test_super_quick_play_skips_cache_when_force_select_requested():
+    """An explicit "Source Select" / "Scrape again" request (force_select
+    in params) must always bypass the Super Quick Play cached shortcut,
+    even when a cached entry exists and Super Quick Play / silent resume
+    are enabled - the user explicitly asked to choose a source and must
+    reach the normal search + source-select flow, not have a cached
+    (possibly stale) entry replayed silently.
+    """
+    params = {"ids": json.dumps({"tmdb_id": 123}), "force_select": True}
+    cache_get = MagicMock(return_value={"url": "plugin://plugin.video.jacktorr/play_magnet?magnet=abc"})
+    player = MagicMock()
+
+    with patch(
+        "lib.search.get_setting",
+        side_effect=lambda key, default=None: key in {"super_quick_play", "silent_resume"},
+    ), patch("lib.search.cache.get", cache_get), patch(
+        "lib.search.JacktookPLayer", return_value=player
+    ):
+        assert _handle_super_quick_play(params) is False
+
+    cache_get.assert_not_called()
+    player.run.assert_not_called()
+
+
 def test_run_search_entry_forwards_trakt_resume_to_source_selection():
     params = {
         "query": "Movie",

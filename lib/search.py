@@ -541,12 +541,6 @@ def _resolve_cached_source(source: Any, params: Mapping[str, Any]):
 
 def _handle_super_quick_play(params: dict) -> bool:
     if params.get("force_select"):
-        # run_search_entry() calls _handle_super_quick_play() before it
-        # even reads "force_select" from params, so an explicit "Source
-        # Select" / "Scrape again" request (which sets force_select=True)
-        # was being silently overridden by a stale cached entry here -
-        # the user asked to choose a source and got a cached one replayed
-        # instead, without ever seeing the source list.
         kodilog("Super quick play: force_select requested, skipping cached shortcut")
         return False
 
@@ -572,28 +566,6 @@ def _handle_super_quick_play(params: dict) -> bool:
         return False
 
     def play_cached_source() -> bool:
-        # `cached_torrent` can be one of two shapes here:
-        #
-        # 1. An already fully-resolved playback_info dict, written by
-        #    resolver_window.py's _cache_playback_info() right after a
-        #    source was picked and resolved once. Its "url" is a
-        #    player-specific locator such as
-        #    plugin://plugin.video.jacktorr/play_magnet?..., not a raw
-        #    Stremio stream candidate.
-        #
-        # 2. A raw/unresolved Stremio source (legacy cache format) that
-        #    still needs to go through classification/resolution, same
-        #    as a fresh search result would.
-        #
-        # Re-running (1) through _resolve_cached_source() re-classifies
-        # an already-resolved player locator as if it were an unresolved
-        # candidate. The classifier correctly rejects it - it's neither
-        # a valid magnet/infoHash nor a plain http(s) URL - raising
-        # StremioPlaybackError(code="malformed_locator"): "The direct
-        # source locator is malformed", even though the cached data was
-        # perfectly playable as-is. So: if it's already a resolved
-        # player-plugin locator, play it directly; otherwise resolve it
-        # as before.
         def play(data: dict) -> None:
             for key in (
                 "simkl_session_id",

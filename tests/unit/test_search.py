@@ -92,7 +92,6 @@ def test_super_quick_play_preserves_simkl_resume_metadata():
     assert played_data["url"] == cached_playback_info["url"]
     assert played_data["simkl_session_id"] == "9"
     assert played_data["simkl_resume_progress"] == "50"
-    # The original cached entry itself must not be mutated in place.
     assert "simkl_session_id" not in cached_playback_info
 
 
@@ -121,13 +120,6 @@ def test_super_quick_play_preserves_trakt_resume_metadata():
 
 
 def test_super_quick_play_plays_resolved_plugin_locator_without_reclassifying():
-    """A cached entry whose "url" is already a player-plugin locator (e.g.
-    written by resolver_window.py after a source was resolved once) must
-    be played directly, not re-run through the Stremio candidate
-    classifier - doing so previously raised a spurious
-    StremioPlaybackError(code="malformed_locator") for perfectly playable
-    cached data.
-    """
     params = {"ids": json.dumps({"tmdb_id": 123})}
     cached_playback_info = {
         "url": "plugin://plugin.video.jacktorr/play_magnet?magnet=abc",
@@ -151,13 +143,6 @@ def test_super_quick_play_plays_resolved_plugin_locator_without_reclassifying():
 
 
 def test_super_quick_play_skips_cache_when_force_select_requested():
-    """An explicit "Source Select" / "Scrape again" request (force_select
-    in params) must always bypass the Super Quick Play cached shortcut,
-    even when a cached entry exists and Super Quick Play / silent resume
-    are enabled - the user explicitly asked to choose a source and must
-    reach the normal search + source-select flow, not have a cached
-    (possibly stale) entry replayed silently.
-    """
     params = {"ids": json.dumps({"tmdb_id": 123}), "force_select": True}
     cache_get = MagicMock(return_value={"url": "plugin://plugin.video.jacktorr/play_magnet?magnet=abc"})
     player = MagicMock()

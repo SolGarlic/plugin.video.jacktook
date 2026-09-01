@@ -540,6 +540,16 @@ def _resolve_cached_source(source: Any, params: Mapping[str, Any]):
 
 
 def _handle_super_quick_play(params: dict) -> bool:
+    if params.get("force_select"):
+        # run_search_entry() calls _handle_super_quick_play() before it
+        # even reads "force_select" from params, so an explicit "Source
+        # Select" / "Scrape again" request (which sets force_select=True)
+        # was being silently overridden by a stale cached entry here -
+        # the user asked to choose a source and got a cached one replayed
+        # instead, without ever seeing the source list.
+        kodilog("Super quick play: force_select requested, skipping cached shortcut")
+        return False
+
     if not get_setting("super_quick_play", False):
         kodilog("Super quick play disabled")
         return False
@@ -562,6 +572,45 @@ def _handle_super_quick_play(params: dict) -> bool:
         return False
 
     def play_cached_source() -> bool:
+        # `cached_torrent` can be one of two shapes here:
+        #
+        # 1. An already fully-resolved playback_info dict, written by
+        #    resolver_window.py's _cache_playback_info() right after a
+        #    source was picked and resolved once. Its "url" is a
+        #    player-specific locator such as
+        #    plugin://plugin.video.jacktorr/play_magnet?..., not a raw
+        #    Stremio stream candidate.
+        #
+        # 2. A raw/unresolved Stremio source (legacy cache format) that
+        #    still needs to go through classification/resolution, same
+        #    as a fresh search result would.
+        #
+        # Re-running (1) through _resolve_cached_source() re-classifies
+        # an already-resolved player locator as if it were an unresolved
+        # candidate. The classifier correctly rejects it - it's neither
+        # a valid magnet/infoHash nor a plain http(s) URL - raising
+        # StremioPlaybackError(code="malformed_locator"): "The direct
+        # source locator is malformed", even though the cached data was
+        # perfectly playable as-is. So: if it's already a resolved
+        # player-plugin locator, play it directly; otherwise resolve it
+        # as before.
+        def play(data: dict) -> None:
+            for key in (
+                "simkl_session_id",
+                "simkl_resume_progress",
+                "trakt_playback_id",
+                "trakt_resume_progress",
+            ):
+                if key in params:
+                    data[key] = params[key]
+            player = JacktookPLayer()
+            player.run(data=data)
+
+        cached_url = cached_torrent.get("url") if isinstance(cached_torrent, Mapping) else None
+        if isinstance(cached_url, str) and cached_url.startswith("plugin://"):
+            play(dict(cached_torrent))
+            return True
+
         try:
             playback_info = _resolve_cached_source(cached_torrent, params)
         except StremioPlaybackError as error:
@@ -579,17 +628,7 @@ def _handle_super_quick_play(params: dict) -> bool:
             notification(translation(90144))
             return True
 
-        for key in (
-            "simkl_session_id",
-            "simkl_resume_progress",
-            "trakt_playback_id",
-            "trakt_resume_progress",
-        ):
-            if key in params:
-                playback_info[key] = params[key]
-
-        player = JacktookPLayer()
-        player.run(data=playback_info)
+        play(playback_info)
         return True
 
     if get_setting("silent_resume", False):
